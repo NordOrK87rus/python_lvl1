@@ -24,7 +24,7 @@ for l in range(len(matrix)):
 matrix_rotate = list(map(list, zip(*matrix)))
 print(f"\nЗадание-1: \n   Вариант 2:", r'list(map(list, zip(*matrix)))')
 for l in range(len(matrix)):
-    print(f"    {matrix[l]} {'->' if l == 1 else '  '} {matrix_rotate[l]} \n")
+    print(f"    {matrix[l]} {'->' if l == 1 else '  '} {matrix_rotate[l]}")
 
 
 # Задание-2:
@@ -68,7 +68,7 @@ for five_d in list(finditer(r'(\d{5})', number)):
         mult_res[int_lst[0]] = (str(five_d.span()[0]),)
 
 m = max(mult_res)
-print(f"Задание-2: Вариант 1 (цикл) : Наибольшее произведение = {m}, смещение первого числа: {', '.join(mult_res[m])}")
+print(f"\nЗадание-2: Вариант 1 (цикл) : Наибольшее произведение = {m}, смещение первого числа: {', '.join(mult_res[m])}")
 
 
 #  Вариант 2 (умножение в 1 строку):
@@ -84,7 +84,7 @@ for five_d in list(finditer(r'(\d{5})', number)):
 
 m = max(mult_res)
 print(f"Задание-2: Вариант 2 (умножение в 1 строку): Наибольшее произведение = {m}, "
-      f"смещение первого числа: {', '.join(mult_res[m])}\n")
+      f"смещение первого числа: {', '.join(mult_res[m])}")
 
 
 # Задание-3 (Ферзи):
