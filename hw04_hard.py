@@ -13,6 +13,20 @@ matrix = [[1, 0, 8],
 
 # Суть сложности hard: Решите задачу в одну строку
 
+# Вариант 1:
+matrix_rotate = [list(x) for x in zip(*matrix)]
+print(f"Задание-1: \n   Вариант 1:", r'[list(x) for x in zip(*matrix)]')
+for l in range(len(matrix)):
+    print(f"    {matrix[l]} {'->' if l == 1 else '  '} {matrix_rotate[l]} ")
+
+
+# Вариант 2: (кажется видел этот вариант на уроке):
+matrix_rotate = list(map(list, zip(*matrix)))
+print(f"\nЗадание-1: \n   Вариант 2:", r'list(map(list, zip(*matrix)))')
+for l in range(len(matrix)):
+    print(f"    {matrix[l]} {'->' if l == 1 else '  '} {matrix_rotate[l]} \n")
+
+
 # Задание-2:
 # Найдите наибольшее произведение пяти последовательных цифр в 1000-значном числе.
 # Выведите произведение и индекс смещения первого числа последовательных 5-ти цифр.
@@ -39,6 +53,40 @@ number = """
 05886116467109405077541002256983155200055935729725
 71636269561882670428252483600823257530420752963450"""
 
+from re import finditer
+mult_res = {}
+
+for five_d in list(finditer(r'(\d{5})', number)):
+    int_lst = list(map(int, five_d.group()))
+    i = 1
+    while i < len(int_lst):
+        int_lst[0] *= int_lst[i]
+        i += 1
+    if int_lst[0] in mult_res.keys():
+        mult_res[int_lst[0]] = mult_res[int_lst[0]] + (str(five_d.span()[0]),)
+    else:
+        mult_res[int_lst[0]] = (str(five_d.span()[0]),)
+
+m = max(mult_res)
+print(f"Задание-2: Вариант 1 (цикл) : Наибольшее произведение = {m}, смещение первого числа: {', '.join(mult_res[m])}")
+
+
+#  Вариант 2 (умножение в 1 строку):
+from functools import reduce
+mult_res = {}
+
+for five_d in list(finditer(r'(\d{5})', number)):
+    m = reduce(lambda x, y: x*y, map(int, five_d.group()))
+    if m in mult_res.keys():
+        mult_res[m] = mult_res[m] + (str(five_d.span()[0]),)
+    else:
+        mult_res[m] = (str(five_d.span()[0]),)
+
+m = max(mult_res)
+print(f"Задание-2: Вариант 2 (умножение в 1 строку): Наибольшее произведение = {m}, "
+      f"смещение первого числа: {', '.join(mult_res[m])}\n")
+
+
 # Задание-3 (Ферзи):
 # Известно, что на доске 8×8 можно расставить 8 ферзей так, чтобы они не били
 # друг друга. Вам дана расстановка 8 ферзей на доске.
@@ -46,3 +94,25 @@ number = """
 # Программа получает на вход восемь пар чисел,
 # каждое число от 1 до 8 — координаты 8 ферзей.
 # Если ферзи не бьют друг друга, выведите слово NO, иначе выведите YES.
+
+coords = [(1, 7), (2, 4), (3, 2), (4, 8), (5, 6), (6, 1), (7, 3), (8, 5)]
+# coords = [(3, 5), (3, 4), (3, 2), (4, 8), (5, 6), (6, 1), (7, 3), (8, 5)]
+
+print(f"\nЗадание-3 (Ферзи): {coords} -> ", end="")
+
+strike = False
+for i in range(len(coords)-1):
+    if not strike:
+        x, y = coords[i]
+        for j in range(i+1, len(coords)):
+            tx, ty = coords[j]
+            if x == tx or y == ty or abs(x - tx) == abs(y - ty):
+                print('YES')
+                strike = True
+                break
+    else:
+        break
+else:
+    print('NO')
+
+
