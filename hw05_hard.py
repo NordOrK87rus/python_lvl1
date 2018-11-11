@@ -25,11 +25,12 @@ print('sys.argv = ', sys.argv)
 
 def print_help():
     print("help - получение справки")
-    print("cp <file_name> - создает копию указанного файла")
-    print("cd <full_path or relative_path> - меняет текущую директорию на указанную")
     print("mkdir <dir_name> - создание директории")
     print("ping - тестовый ключ")
+    print("cp <file_name> - создает копию указанного файла")
     print("rm <file_name> - удаляет указанный файл (запросить подтверждение операции)")
+    print("cd <full_path or relative_path> - меняет текущую директорию на указанную")
+    print("ls - отображение полного пути текущей директории")
 
 
 def make_dir():
@@ -52,7 +53,7 @@ def cp():
     if not param:
         print("Необходимо указать имя копируемого файла вторым параметром")
         return
-    src_fpath = os.path.join(os.getcwd(), param)
+    src_fpath = os.path.abspath(param)
 
     with open(src_fpath, 'r') as s:
         fn, fe = os.path.splitext(os.path.basename(src_fpath))
@@ -63,15 +64,28 @@ def cp():
             d.write(s.read())
     print(f'копия файла {param} создана с именем {fn}_copy{copy_num}{fe}')
 
+
 def cd():
-    pass
+    if not param:
+        print("Необходимо указать директорию для перехода")
+        return
+    abs_path = os.path.abspath(param)
+    try:
+        os.chdir(abs_path)
+        print(f"переход в {abs_path} успешно выполнен")
+    except FileNotFoundError:
+        print(f"невозможно выполнить переход, директория {abs_path} не существует")
+
+
+def ls():
+    print(os.path.abspath(os.getcwd()))
 
 
 def rm():
     if not param:
         print("Необходимо указать имя удаляемого файла вторым параметром")
         return
-    del_fpath = os.path.join(os.getcwd(), param)
+    del_fpath = os.path.abspath(param)
     confirm = input(f"Вы действительно хотите удалить {del_fpath}? (y/n): ").strip().lower() == 'y'
     if confirm:
         try:
@@ -91,7 +105,8 @@ do = {
     "ping": ping,
     "cp": cp,
     "cd": cd,
-    "rm": rm
+    "rm": rm,
+    "ls": ls
 }
 
 try:
