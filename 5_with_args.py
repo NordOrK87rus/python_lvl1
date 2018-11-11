@@ -1,4 +1,4 @@
- Данный скрипт можно запускать с параметрами:
+# Данный скрипт можно запускать с параметрами:
 # python with_args.py param1 param2 param3
 import os
 import sys
