@@ -74,6 +74,7 @@ else:
             print("{0}. {1}".format(n, d))
 
         in_cmd = input(f":> ")
-        if in_cmd.strip() == "0":
+        in_cmd = in_cmd.strip()
+        if in_cmd == "0":
             break
-        do_cmd(in_cmd.strip())
+        do_cmd(in_cmd)
