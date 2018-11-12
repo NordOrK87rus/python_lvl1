@@ -18,12 +18,14 @@ from os import getcwd, chdir, path as os_path, listdir as os_listdir
 from sys import argv
 from hw05_easy import del_dir, make_dir, list_of_folders
 
-print(f"sys.argv = {argv}\n")
+print(f"sys.argv = {argv}")
 
 cmd_list = [(1, 'Перейти в папку'),
             (2, 'Просмотреть содержимое текущей папки'),
             (3, 'Удалить папку'),
-            (4, 'Создать папку')]
+            (4, 'Создать папку'),
+            (0, 'Выход'),
+            ]
 
 
 def do_cmd(cmd):
@@ -40,15 +42,21 @@ def do_cmd(cmd):
         else:
             print(f" -> Невозможно перейти в папку {d}, так как её не существует.")
     elif cmd == "2":
+        dirs = set()
+        files = set()
         for i in os_listdir(getcwd()):
-            print(" ", i)
+            if os_path.isdir(i) or os_path.ismount(i):
+                dirs.add(f"{i}/")
+            else:
+                files.add(f"{i}")
+
+        print(*dirs, *files, sep="\n")
+
     elif cmd == "3":
         d = input(" -> Введите имя папки для удаления: ")
-        d = d.strip()
         del_dir(d.strip())
     elif cmd == "4":
         d = input(" -> Введите имя создаваемой папки: ")
-        d = d.strip()
         make_dir(d.strip())
     else:
         print(f"Команда \"{cmd}\" недопустима.")
@@ -60,9 +68,12 @@ if len(argv) > 1:
 else:
     # Если небыло передано аргументов, то утилита просит пользователя ввести команду
     # и будет выполняться пока пользователь не ведёт exit
-    print(f"\nВыберите действие:")
-    for n, d in cmd_list:
-        print("{0}. {1}".format(n, d))
+    while True:
+        print(f"\nВыберите действие:")
+        for n, d in cmd_list:
+            print("{0}. {1}".format(n, d))
 
-    in_cmd = input(f":> ")
-    do_cmd(in_cmd.strip())
+        in_cmd = input(f":> ")
+        if in_cmd.strip() == "0":
+            break
+        do_cmd(in_cmd.strip())
