@@ -1,0 +1,11 @@
+GfhjkmLkzGjujls
+
+jistetagnu
+jistetagnu@ezehe.com
+
+APPID=0e04045c4228904f92e22928c81630a2
+
+http://api.openweathermap.org/data/2.5/weather?q=London,uk&appid=0e04045c4228904f92e22928c81630a2
+
+
+
