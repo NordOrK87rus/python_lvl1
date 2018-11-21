@@ -101,12 +101,14 @@ import json
 import xml.etree.ElementTree as ET
 import sqlite3
 
+APPID = None
+
 
 class OWData(object):
     class CityList(object):
         def __init__(self):
             self._files = {'cities': ('city.list.json.gz', 'http://bulk.openweathermap.org/sample/city.list.json.gz'),
-                           'country_codes': ('country_codes.xml', 'https://www.artlebedev.ru/country-list/xml/')}
+                           'country_codes': ('country_codes.xml', 'http://www.artlebedev.ru/country-list/xml/')}
 
             for k, f in self._files.items():
                 if not os.path.exists(f[0]):
@@ -151,17 +153,16 @@ class OWData(object):
     # ------------------------------------------------------------------
     class LocalDB(object):
         def __init__(self):
-            self._db_file = 'wheather.db'
-            self._conn = sqlite3.connect("wheather.db")
+            self._db_file = 'weather.db'
+            self._conn = sqlite3.connect("weather.db")
             self.cursor = self._conn.cursor()
-            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' and name='wheather';")
             if not self._check_db():
-                self.cursor.execute("CREATE TABLE wheather("
+                self.cursor.execute("CREATE TABLE weather("
                                     "id_city INTEGER PRIMARY KEY,"
                                     "city VARCHAR(255), "
                                     "date DATE, "
-                                    "temp INTEGER, "
-                                    "id_wheather INTEGER )")
+                                    "temper INTEGER, "
+                                    "id_weather INTEGER )")
 
         def __del__(self):
             self._conn.close()
@@ -170,24 +171,38 @@ class OWData(object):
             """
             Проверяет существование нужной нам таблицы
             """
-            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' and name='wheather';")
+            self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' and name='weather';")
             return len(self.cursor.fetchall())
 
-        def get_city_data_by_name(self, value):
-            self.cursor.execute(f"SELECT * FROM wheather WHERE city='{value}';")
+        def get_city_data_by_name(self, value, dt=None):
+            self.cursor.execute(f"SELECT * FROM weather WHERE city=\'{value}\'{' AND date=%d' % dt if dt else ''};")
             return self.cursor.fetchall()
 
-        def get_city_data_by_id(self, value):
-            self.cursor.execute(f"SELECT * FROM wheather WHERE id_city='{value}'';")
+        def get_city_data_by_id(self, value, dt=None):
+            self.cursor.execute(f"SELECT * FROM weather WHERE id_city=\'{value}\'{' AND date=%d' % dt if dt else ''};")
             return self.cursor.fetchall()
 
         def update_data(self, targets):
             for r in range(0, len(targets), 20):
                 id_s = ",".join(map(str, list(targets.keys())[r: r + 20]))
-                x = 0
+                resp = url_req.urlopen(f'http://api.openweathermap.org/data/2.5/group?id={id_s}&units=metric'
+                                       f'&mode=xml&appid={APPID}')
+
+                t_json = json.load(resp)
+                for i in t_json['list']:
+                    if len(self.get_city_data_by_id(i['id'])) > 0:
+                        self.cursor.execute(f"UPDATE weather SET temp={i['main']['temp']} WHERE id_city={i['id']};")
+                        self._conn.commit()
+                    else:
+                        self.cursor.execute(f"INSERT INTO weather VALUES ({i['id']},\'{i['name']}\',{i['dt']},"
+                                            f"{i['main']['temp']},{i['weather'][0]['id']});")
+                        self._conn.commit()
+                        pass
+                    x = 0
 
     # ------------------------------------------------------------------
     def __init__(self):
+        global APPID
         self._cl = OWData.CityList()
         self._db = OWData.LocalDB()
 
@@ -199,7 +214,7 @@ class OWData(object):
         except IOError as e:
             print(e)
         else:
-            self.appid = result.strip()
+            APPID = result.strip()
 
     @property
     def countries(self):
@@ -237,7 +252,7 @@ class OWData(object):
         else:
             print(f"Не могу найти города для страны \"{country}\"")
 
-    def print_wheather(self, trg_data):
+    def print_weather(self, trg_data):
         data_lst = {}
         country = self._cl.find_country(trg_data)
         if not country:
@@ -248,7 +263,6 @@ class OWData(object):
         else:
             data_lst.update(self._cl.cities_of_country(country))
         self._db.update_data(data_lst)
-
 
         x = "processing"
 
@@ -275,7 +289,7 @@ def main():
             owd.print_cities_of_country(cur_country.strip())
         elif user_answer == "3":
             req_data = input("Ввведите город или страну для выборки: ")
-            owd.print_wheather(req_data.strip())
+            owd.print_weather(req_data.strip())
         elif user_answer == "0":
             break
         else:
