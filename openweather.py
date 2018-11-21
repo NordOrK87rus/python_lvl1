@@ -158,9 +158,9 @@ class OWData(object):
             if not self._check_db():
                 self.cursor.execute("CREATE TABLE wheather("
                                     "id_city INTEGER PRIMARY KEY,"
-                                    "City VARCHAR(255), "
-                                    "Date DATE, "
-                                    "Temp INTEGER, "
+                                    "city VARCHAR(255), "
+                                    "date DATE, "
+                                    "temp INTEGER, "
                                     "id_wheather INTEGER )")
 
         def __del__(self):
@@ -174,7 +174,7 @@ class OWData(object):
             return len(self.cursor.fetchall())
 
         def get_city_data_by_name(self, value):
-            self.cursor.execute(f"SELECT * FROM wheather WHERE City='{value}';")
+            self.cursor.execute(f"SELECT * FROM wheather WHERE city='{value}';")
             return self.cursor.fetchall()
 
         def get_city_data_by_id(self, value):
