@@ -121,22 +121,34 @@ class OWData(object):
                 self._data = json.load(gf)
 
             # Вычитываем коды стран
-            self._contry_codes = ET.parse(self._files['country_codes'][0])
+            self._country_codes = ET.parse(self._files['country_codes'][0])
 
         @property
         def countries(self):
             result = set()
             for c in {i['country'] for i in self._data if len(i['country']) > 0}:
-                result.add((c, self._contry_codes.findtext(f'./country/[alpha2=\"{c}\"]/english')))
+                result.add((c, self._country_codes.findtext(f'./country/[alpha2=\"{c}\"]/english')))
             return sorted(result)
 
         def cities_of_country(self, country):
             if len(country) > 2:
-                ccode = self._contry_codes.findtext(f'./country/[english=\"{country}\"]/alpha2')
+                ccode = self._country_codes.findtext(f'./country/[english=\"{country}\"]/alpha2')
             else:
                 ccode = country.upper()
             return {i["id"]: i["name"] for i in self._data if i['country'] == ccode}
 
+        def find_country(self, value):
+            result = self._country_codes.findtext(f'./country/[alpha2=\"{value.upper()}\"]/alpha2')
+            result = self._country_codes.findtext(f'./country/[english=\"{value}\"]/alpha2') if not result else result
+            return result
+
+        def find_city(self, value):
+            try:
+                return {next(filter(lambda x: x["name"] == value, self._data))['id']: value}
+            except StopIteration:
+                return
+
+    # ------------------------------------------------------------------
     class LocalDB(object):
         def __init__(self):
             self._db_file = 'wheather.db'
@@ -155,9 +167,26 @@ class OWData(object):
             self._conn.close()
 
         def _check_db(self):
+            """
+            Проверяет существование нужной нам таблицы
+            """
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' and name='wheather';")
             return len(self.cursor.fetchall())
 
+        def get_city_data_by_name(self, value):
+            self.cursor.execute(f"SELECT * FROM wheather WHERE City='{value}';")
+            return self.cursor.fetchall()
+
+        def get_city_data_by_id(self, value):
+            self.cursor.execute(f"SELECT * FROM wheather WHERE id_city='{value}'';")
+            return self.cursor.fetchall()
+
+        def update_data(self, targets):
+            for r in range(0, len(targets), 20):
+                id_s = ",".join(map(str, list(targets.keys())[r: r + 20]))
+                x = 0
+
+    # ------------------------------------------------------------------
     def __init__(self):
         self._cl = OWData.CityList()
         self._db = OWData.LocalDB()
@@ -204,9 +233,24 @@ class OWData(object):
             ccl_si = sorted(ccl, key=lambda x: ccl[x])
             for j in range(0, len(ccl), 3):
                 print(s_template.format(*(map(lambda x: ccl.get(x, "-"), ccl_si[j:j + 3] +
-                                                  [""]*(3 - len(ccl_si[j:j + 3]))))))
+                                              [""] * (3 - len(ccl_si[j:j + 3]))))))
         else:
             print(f"Не могу найти города для страны \"{country}\"")
+
+    def print_wheather(self, trg_data):
+        data_lst = {}
+        country = self._cl.find_country(trg_data)
+        if not country:
+            city = self._db.get_city_data_by_name(trg_data)
+            city = city if len(city) > 0 else self._cl.find_city(trg_data)
+            if city:
+                data_lst.update(city)
+        else:
+            data_lst.update(self._cl.cities_of_country(country))
+        self._db.update_data(data_lst)
+
+
+        x = "processing"
 
 
 def print_help():
@@ -222,17 +266,20 @@ def main():
     owd = OWData()
     while True:
         print_help()
-        user_answer = int(input("Выберите действие: "))
+        user_answer = input("Выберите действие: ")
 
-        if user_answer == 1:
+        if user_answer == "1":
             owd.print_countries()
-        elif user_answer == 2:
+        elif user_answer == "2":
             cur_country = input("Ввведите код страны или её название (из списка): ")
             owd.print_cities_of_country(cur_country.strip())
-        elif user_answer == 3:
-            cur_country = input("Ввведите город или : ")
-        else:
+        elif user_answer == "3":
+            req_data = input("Ввведите город или страну для выборки: ")
+            owd.print_wheather(req_data.strip())
+        elif user_answer == "0":
             break
+        else:
+            print("Вы ввели неверную команду, попробуйте ещё раз.")
 
 
 if __name__ == "__main__":
