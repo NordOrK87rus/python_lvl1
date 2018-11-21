@@ -105,33 +105,37 @@ import sqlite3
 class OWData(object):
     class CityList(object):
         def __init__(self):
-            self._data = None
-            self._clj_file = 'city.list.json.gz'
+            self._files = {'cities': ('city.list.json.gz', 'http://bulk.openweathermap.org/sample/city.list.json.gz'),
+                           'country_codes': ('country_codes.xml', 'https://www.artlebedev.ru/country-list/xml/')}
 
-            if not os.path.exists(self._clj_file):
-                print(f"Файл списка городов не найден! \nСкачиваю файл.... ", end="")
-                resp = url_req.urlopen('http://bulk.openweathermap.org/sample/city.list.json.gz')
-                if resp.code == 200:
-                    with open(self._clj_file, 'wb') as clj:
-                        clj.write(resp.read())
+            for k, f in self._files.items():
+                if not os.path.exists(f[0]):
+                    print(f"Файл {f[0]} не найден! \nСкачиваю файл.... ", end="")
+                    resp = url_req.urlopen(f[1])
+                    with open(f[0], 'wb') as fd:
+                        fd.write(resp.read())
                     print("Ok")
-                else:
-                    print(f"Ошибка при получении файла списка городов")
-                    exit()
 
-        #     TODO: Получить и сопоставить названия стран их кодам
+            # Вычитываем данные из списка городов
+            with gzip.open(self._files['cities'][0]) as gf:
+                self._data = json.load(gf)
 
-
-
-        def _file_data(self):
-            if not self._data:
-                with gzip.open(self._clj_file) as gf:
-                    self._data = json.load(gf)
-            return self._data
+            # Вычитываем коды стран
+            self._contry_codes = ET.parse(self._files['country_codes'][0])
 
         @property
         def countries(self):
-            return sorted({i['country'] for i in self._file_data() if len(i['country']) > 0})
+            result = set()
+            for c in {i['country'] for i in self._data if len(i['country']) > 0}:
+                result.add((c, self._contry_codes.findtext(f'./country/[alpha2=\"{c}\"]/english')))
+            return sorted(result)
+
+        def cities_of_country(self, country):
+            if len(country) > 2:
+                ccode = self._contry_codes.findtext(f'./country/[english=\"{country}\"]/alpha2')
+            else:
+                ccode = country.upper()
+            return {i["id"]: i["name"] for i in self._data if i['country'] == ccode}
 
     class LocalDB(object):
         def __init__(self):
@@ -172,21 +176,63 @@ class OWData(object):
     def countries(self):
         return self._cl.countries
 
-    def cities(self, country=None):
-        return None
+    def print_countries(self):
+        """
+        Выводит список доступных в файле стран
+        """
+        print("Список доступных стран:")
+        s_template = "[{0:<2}] {1:<%d}" % (max(map(lambda x: len(x[1]) if x[1] else 0, self.countries)) + 2)
+        for i in sorted({l[0][0] for l in self.countries}):
+            print(f"------------\n{i}:\n------------")
+            cl = list(filter(lambda x: x[0][0] == i, self.countries))
+            for j in range(0, len(cl), 2):
+                s = ""
+                for ci in cl[j: j + 2]:
+                    s += s_template.format(ci[0], ci[1] if ci[1] else f"{ci[0]}_UNKNOWN")
+                print(s)
+
+    def print_cities_of_country(self, country):
+        """
+        Выводит список городов указанной страны
+        :param country: страна для выборки
+        """
+        print(f"Список городов страны {country}:")
+        ccl = self._cl.cities_of_country(country)
+        if len(ccl) > 0:
+            s_template = " ".join(
+                ["{%d:<%d}" % (i[0], i[1],) for i in enumerate([max(map(len, ccl.values())) + 2] * 3)])
+            ccl_si = sorted(ccl, key=lambda x: ccl[x])
+            for j in range(0, len(ccl), 3):
+                print(s_template.format(*(map(lambda x: ccl.get(x, "-"), ccl_si[j:j + 3] +
+                                                  [""]*(3 - len(ccl_si[j:j + 3]))))))
+        else:
+            print(f"Не могу найти города для страны \"{country}\"")
+
 
 def print_help():
-    m = ((1, "Вывести список доступных стран"),
-         (2, "Вывести список доступных городов"),
-         (3, "Вывести данные о погоде"),
-         (0, "Выход"),
-         )
+    print("=" * 15)
+    for m in ((1, "Вывести список доступных стран"), (2, "Вывести список доступных городов"),
+              (3, "Вывести данные о погоде"), (0, "Выход"),
+              ):
+        print(f"{m[0]}. {m[1]}")
+    print("-" * 15)
+
 
 def main():
     owd = OWData()
     while True:
-        user_answer = input("Выберите действие: ")
-    print(owd.countries)
+        print_help()
+        user_answer = int(input("Выберите действие: "))
+
+        if user_answer == 1:
+            owd.print_countries()
+        elif user_answer == 2:
+            cur_country = input("Ввведите код страны или её название (из списка): ")
+            owd.print_cities_of_country(cur_country.strip())
+        elif user_answer == 3:
+            cur_country = input("Ввведите город или : ")
+        else:
+            break
 
 
 if __name__ == "__main__":
