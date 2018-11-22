@@ -100,8 +100,40 @@ import gzip
 import json
 import xml.etree.ElementTree as ET
 import sqlite3
+import datetime as dtm
 
 APPID = None
+
+
+def update_data(func):
+    def wrapper(self, value, dt=None):
+        def f_date(v):
+            return int(dtm.datetime.fromisoformat(v.isoformat()).timestamp())
+
+        cur_date = f_date(dtm.datetime.date(dtm.datetime.utcnow()))
+        for r in range(0, len(value), 20):
+            id_s = ",".join(map(str, list(value.keys())[r: r + 20]))
+            resp = url_req.urlopen(f'http://api.openweathermap.org/data/2.5/group?id={id_s}&units=metric'
+                                   f'&mode=xml&appid={APPID}')
+
+            t_json = json.load(resp)
+            for i in t_json['list']:
+                print(f"Обновление данных для города \"{i['name']}\"...", end="")
+                self.cursor.execute(f"SELECT * FROM weather WHERE id_city={i['id']};")
+
+                if len(self.cursor.fetchall()) > 0:
+                    self.cursor.execute(f"UPDATE weather SET temper={i['main']['temp']}, date={cur_date} "
+                                        f"WHERE id_city={i['id']};")
+                    self._conn.commit()
+                else:
+                    self.cursor.execute(f"INSERT INTO weather VALUES ({i['id']},\'{i['name']}\',"
+                                        f"{f_date(dtm.datetime.fromtimestamp(i['dt']).date())},"
+                                        f"{i['main']['temp']},{i['weather'][0]['id']});")
+                    self._conn.commit()
+                print(" Ok")
+        return func(self, value, dt)
+
+    return wrapper
 
 
 class OWData(object):
@@ -153,7 +185,6 @@ class OWData(object):
     # ------------------------------------------------------------------
     class LocalDB(object):
         def __init__(self):
-            self._db_file = 'weather.db'
             self._conn = sqlite3.connect("weather.db")
             self.cursor = self._conn.cursor()
             if not self._check_db():
@@ -174,31 +205,16 @@ class OWData(object):
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table' and name='weather';")
             return len(self.cursor.fetchall())
 
-        def get_city_data_by_name(self, value, dt=None):
-            self.cursor.execute(f"SELECT * FROM weather WHERE city=\'{value}\'{' AND date=%d' % dt if dt else ''};")
+        def find_city_by_name(self, value):
+            self.cursor.execute(f"SELECT DISTINCT id_city, city FROM weather WHERE city=\'{value}\';")
             return self.cursor.fetchall()
 
-        def get_city_data_by_id(self, value, dt=None):
-            self.cursor.execute(f"SELECT * FROM weather WHERE id_city=\'{value}\'{' AND date=%d' % dt if dt else ''};")
+        @update_data
+        def get_city_data(self, value, dt=None):
+            self.cursor.execute(f"SELECT * FROM weather WHERE id_city "
+                                f"IN({','.join(map(str, value.keys()))}) {'AND date=%d' % dt if dt else ' '} ORDER "
+                                f"BY city ASC;")
             return self.cursor.fetchall()
-
-        def update_data(self, targets):
-            for r in range(0, len(targets), 20):
-                id_s = ",".join(map(str, list(targets.keys())[r: r + 20]))
-                resp = url_req.urlopen(f'http://api.openweathermap.org/data/2.5/group?id={id_s}&units=metric'
-                                       f'&mode=xml&appid={APPID}')
-
-                t_json = json.load(resp)
-                for i in t_json['list']:
-                    if len(self.get_city_data_by_id(i['id'])) > 0:
-                        self.cursor.execute(f"UPDATE weather SET temp={i['main']['temp']} WHERE id_city={i['id']};")
-                        self._conn.commit()
-                    else:
-                        self.cursor.execute(f"INSERT INTO weather VALUES ({i['id']},\'{i['name']}\',{i['dt']},"
-                                            f"{i['main']['temp']},{i['weather'][0]['id']});")
-                        self._conn.commit()
-                        pass
-                    x = 0
 
     # ------------------------------------------------------------------
     def __init__(self):
@@ -247,7 +263,7 @@ class OWData(object):
                 ["{%d:<%d}" % (i[0], i[1],) for i in enumerate([max(map(len, ccl.values())) + 2] * 3)])
             ccl_si = sorted(ccl, key=lambda x: ccl[x])
             for j in range(0, len(ccl), 3):
-                print(s_template.format(*(map(lambda x: ccl.get(x, "-"), ccl_si[j:j + 3] +
+                print(s_template.format(*(map(lambda x: ccl.get(x, ""), ccl_si[j:j + 3] +
                                               [""] * (3 - len(ccl_si[j:j + 3]))))))
         else:
             print(f"Не могу найти города для страны \"{country}\"")
@@ -256,19 +272,30 @@ class OWData(object):
         data_lst = {}
         country = self._cl.find_country(trg_data)
         if not country:
-            city = self._db.get_city_data_by_name(trg_data)
-            city = city if len(city) > 0 else self._cl.find_city(trg_data)
+
+            city = self._db.find_city_by_name(trg_data)
+            city = {city[0][0]: city[0][1]} if len(city) > 0 else self._cl.find_city(trg_data)
             if city:
                 data_lst.update(city)
         else:
             data_lst.update(self._cl.cities_of_country(country))
-        self._db.update_data(data_lst)
 
-        x = "processing"
+        c_data = self._db.get_city_data(data_lst)
+        if len(c_data) > 0:
+            max_clen = max(map(lambda x: len(x) + 2, data_lst.values()))
+            h_line = ("{l_sym:-^%d}+{l_sym:-^13}+{l_sym:-^17}" % (max_clen if max_clen > 7 else 7)).format(l_sym="-")
+            s_template = "{0:<%d}|{1:^13}|{2:^17}" % (max_clen if max_clen > 7 else 7)
+            print(h_line)
+            print(s_template.format("Город", "Температура", "Дата"))
+            print(h_line)
+            for i in c_data:
+                print(s_template.format(i[1], i[3], dtm.date.fromtimestamp(i[2]).strftime('%d.%m.%Y')))
+        else:
+            print("Данные не обнаружены!")
 
 
 def print_help():
-    print("=" * 15)
+    print("\n"+"=" * 15)
     for m in ((1, "Вывести список доступных стран"), (2, "Вывести список доступных городов"),
               (3, "Вывести данные о погоде"), (0, "Выход"),
               ):
