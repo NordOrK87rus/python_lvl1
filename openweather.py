@@ -106,6 +106,9 @@ APPID = None
 
 
 def update_data(func):
+    """
+    Декоратор обновляющий данные в БД перед выборкой
+    """
     def wrapper(self, value, dt=None):
         def f_date(v):
             return int(dtm.datetime.fromisoformat(v.isoformat()).timestamp())
@@ -159,12 +162,19 @@ class OWData(object):
 
         @property
         def countries(self):
+            """
+            Возвращает список доступных стран
+            """
             result = set()
             for c in {i['country'] for i in self._data if len(i['country']) > 0}:
                 result.add((c, self._country_codes.findtext(f'./country/[alpha2=\"{c}\"]/english')))
             return sorted(result)
 
         def cities_of_country(self, country):
+            """
+            Перечень городов страны
+            :param country: наименование анализируемой страны
+            """
             if len(country) > 2:
                 ccode = self._country_codes.findtext(f'./country/[english=\"{country}\"]/alpha2')
             else:
@@ -172,11 +182,18 @@ class OWData(object):
             return {i["id"]: i["name"] for i in self._data if i['country'] == ccode}
 
         def find_country(self, value):
+            """
+            Ищет страну по коду или наименованию
+
+            """
             result = self._country_codes.findtext(f'./country/[alpha2=\"{value.upper()}\"]/alpha2')
             result = self._country_codes.findtext(f'./country/[english=\"{value}\"]/alpha2') if not result else result
             return result
 
         def find_city(self, value):
+            """
+            Поиск города
+            """
             try:
                 return {next(filter(lambda x: x["name"] == value, self._data))['id']: value}
             except StopIteration:
@@ -206,11 +223,17 @@ class OWData(object):
             return len(self.cursor.fetchall())
 
         def find_city_by_name(self, value):
+            """
+            Поиск в БД города по наименованию
+            """
             self.cursor.execute(f"SELECT DISTINCT id_city, city FROM weather WHERE city=\'{value}\';")
             return self.cursor.fetchall()
 
         @update_data
         def get_city_data(self, value, dt=None):
+            """
+            Получение данных по городу/списку городов из БД
+            """
             self.cursor.execute(f"SELECT * FROM weather WHERE id_city "
                                 f"IN({','.join(map(str, value.keys()))}) {'AND date=%d' % dt if dt else ' '} ORDER "
                                 f"BY city ASC;")
@@ -269,6 +292,9 @@ class OWData(object):
             print(f"Не могу найти города для страны \"{country}\"")
 
     def print_weather(self, trg_data):
+        """
+        Выводит данные о погоде
+        """
         data_lst = {}
         country = self._cl.find_country(trg_data)
         if not country:
@@ -295,6 +321,9 @@ class OWData(object):
 
 
 def print_help():
+    """
+    Вывод помощи
+    """
     print("\n"+"=" * 15)
     for m in ((1, "Вывести список доступных стран"), (2, "Вывести список доступных городов"),
               (3, "Вывести данные о погоде"), (0, "Выход"),
